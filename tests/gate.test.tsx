@@ -20,15 +20,21 @@ const PANE = {
   },
 } as const
 
-type Fake = { calls: string[]; reads: string[] }
+type Fake = { calls: string[]; reads: string[]; tools: string[] }
 
 function fake(on: Parameters<TestBody>[1], origin: string, plan = ''): Fake {
-  const seen: Fake = { calls: [], reads: [] }
+  const seen: Fake = { calls: [], reads: [], tools: [] }
 
   on('session.cwd', () => ({ value: '/w' }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('prompt.compose', () => ({ sections: [] }))
   on('command.register', (_$, e) => ({ value: { command: e.name } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('tool.register', (_$, e) => {
+    seen.tools.push(e.name)
+
+    return { value: { tool: `mcp__issue-dial__${e.name}` } }
+  })
   on('clock.now', () => ({ value: 1 }))
   on('fs.read', (_$, e) => {
     seen.reads.push((e as unknown as { path: string }).path)
@@ -85,6 +91,7 @@ test('with no repo list the dial turns on in any GitHub repo and reads that repo
 
   expect(text).toContain('mcp__issue-dial__set_focus')
   expect(text).not.toMatch(/Alex|Vellum/)
+  expect(seen.tools).toEqual(['set_focus'])
 
   await $.tool.call({ tool: 'mcp__issue-dial__set_focus', current: 42, next: [] } as never)
 
@@ -99,6 +106,7 @@ test('a repo off the list leaves the dial off', { options: { repos: ['octo/gadge
   await $.session.start(START)
 
   expect(await focusText($)).toBe(undefined)
+  expect(seen.tools).toEqual([])
   expect(seen.calls.some(call => call.startsWith('gh '))).toBe(false)
 })
 
@@ -111,11 +119,12 @@ test('a repo on the list turns the dial on', { options: { repos: ['Octo/Widgets'
 })
 
 test('a remote that is not GitHub leaves the dial off', async ($, on) => {
-  fake(on, 'https://gitlab.com/octo/widgets.git')
+  const seen = fake(on, 'https://gitlab.com/octo/widgets.git')
 
   await $.session.start(START)
 
   expect(await focusText($)).toBe(undefined)
+  expect(seen.tools).toEqual([])
 })
 
 test(

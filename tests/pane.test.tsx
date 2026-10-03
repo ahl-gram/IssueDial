@@ -54,6 +54,8 @@ test('the dial draws past above, the issue in hand bold between rules, next belo
   on('session.cwd', () => ({ value: '/v' }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('command.register', (_$, e) => ({ value: { command: e.name } }))
+  on('tool.register', (_$, e) => ({ value: { tool: `mcp__issue-dial__${e.name}` } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
   on('fs.read', () => ({ value: RESUME }))
   on('clock.now', () => ({ value: 1 }))
   on('process.run', (_$, e) => ({
@@ -89,6 +91,8 @@ test('when gh fails the pane says so instead of going blank', async ($, on) => {
   on('session.cwd', () => ({ value: '/v' }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('command.register', (_$, e) => ({ value: { command: e.name } }))
+  on('tool.register', (_$, e) => ({ value: { tool: `mcp__issue-dial__${e.name}` } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
   on('process.run', (_$, e) =>
     e.argv.join(' ') === 'git remote get-url origin'
       ? { value: { exitCode: 0, stdout: 'https://github.com/octo/widgets.git\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
