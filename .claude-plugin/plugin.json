@@ -1,6 +1,30 @@
 {
   "name": "issue-dial",
-  "version": "0.1.0",
-  "description": "A picker-wheel pane for Vellum: the last three closed issues above, the issue in hand in the middle, the suggested next ones below.",
-  "types": "./types/index.d.ts"
+  "version": "0.2.0",
+  "description": "A picker-wheel pane for a GitHub repo's issues: the last three closed above, the issue in hand in the middle, the suggested next ones below.",
+  "author": {
+    "name": "Alexander Lee"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "repos": {
+      "type": "string",
+      "multiple": true,
+      "title": "Repos",
+      "description": "The GitHub repos the dial turns on in, each as owner/name. Leave empty to turn it on in every GitHub repo.",
+      "default": []
+    },
+    "planFile": {
+      "type": "string",
+      "title": "Plan file",
+      "description": "A file at the main checkout's root whose plan section lists the issues to suggest next. A missing file is fine.",
+      "default": "RESUME-HERE.md"
+    },
+    "planHeading": {
+      "type": "string",
+      "title": "Plan heading",
+      "description": "The text of the ## heading that starts the plan section in the plan file.",
+      "default": "Next steps"
+    }
+  }
 }

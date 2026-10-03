@@ -4,10 +4,12 @@ import {
   buildWheel,
   fadeOf,
   fadedColor,
+  isAllowed,
   issueFromBranch,
   latestCompleted,
   mainWorktree,
   nextStepsNumbers,
+  repoFromRemote,
   upcoming,
 } from '../hooks/logic'
 
@@ -33,8 +35,35 @@ test('next issues are the Next steps section, in order, without PR numbers', asy
     'Issue #999',
   ].join('\n')
 
-  expect(nextStepsNumbers(resume)).toEqual([638, 727, 729, 733])
-  expect(nextStepsNumbers('# no sections here #12')).toEqual([])
+  expect(nextStepsNumbers(resume, 'Next steps')).toEqual([638, 727, 729, 733])
+  expect(nextStepsNumbers('# no sections here #12', 'Next steps')).toEqual([])
+})
+
+test('next issues can come from a section with another heading', async () => {
+  const plan = ['## Next steps', '1. #1', '', '## Up next', '- #42 then #57, after PR #9', '', '## Later', '#99'].join('\n')
+
+  expect(nextStepsNumbers(plan, 'Up next')).toEqual([42, 57])
+  expect(nextStepsNumbers(plan, 'up NEXT')).toEqual([42, 57])
+  expect(nextStepsNumbers(plan, 'Missing')).toEqual([])
+})
+
+test('a GitHub origin names its owner and repo, whatever its URL form', async () => {
+  expect(repoFromRemote('https://github.com/octo/widgets.git\n')).toEqual({ owner: 'octo', name: 'widgets' })
+  expect(repoFromRemote('https://github.com/octo/widgets')).toEqual({ owner: 'octo', name: 'widgets' })
+  expect(repoFromRemote('git@github.com:octo/my.widgets.git')).toEqual({ owner: 'octo', name: 'my.widgets' })
+  expect(repoFromRemote('ssh://git@github.com/octo/widgets.git')).toEqual({ owner: 'octo', name: 'widgets' })
+  expect(repoFromRemote('https://gitlab.com/octo/widgets.git')).toBe(null)
+  expect(repoFromRemote('https://github.com.evil.example/octo/widgets.git')).toBe(null)
+  expect(repoFromRemote('')).toBe(null)
+})
+
+test('an empty repo list allows every repo, a listed one only those, ignoring case', async () => {
+  const repo = { owner: 'Octo', name: 'Widgets' }
+
+  expect(isAllowed(repo, [])).toBe(true)
+  expect(isAllowed(repo, ['octo/widgets'])).toBe(true)
+  expect(isAllowed(repo, [' octo/widgets '])).toBe(true)
+  expect(isAllowed(repo, ['octo/gadgets', 'other/widgets'])).toBe(false)
 })
 
 test('the main checkout is the first worktree listed', async () => {

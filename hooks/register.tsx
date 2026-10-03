@@ -10,13 +10,13 @@ import {
   issueFromBranch,
   latestCompleted,
   mainWorktree,
+  isAllowed,
   nextStepsNumbers,
+  repoFromRemote,
   upcoming,
 } from './logic'
-import type { GhIssue } from './logic'
+import type { GhIssue, Repo } from './logic'
 
-const OWNER = 'ahl-gram'
-const NAME = 'Vellum'
 const PANE = 'issue-dial'
 const TITLE = 'Issue dial'
 const TOOL = 'set_focus'
@@ -41,7 +41,9 @@ const focus = atom({ plugin: 'issue-dial', key: 'focus' } as const, { current: n
 
 type Known = { title: string; isOpen: boolean }
 
-let isVellum = false
+type Setup = { repo: Repo; planFile: string; planHeading: string }
+
+let setup: Setup | null = null
 let closed: IssueRow[] | null = null
 const known = new Map<number, Known>()
 
@@ -63,13 +65,13 @@ async function readOr($: EngineInterface, path: string, fallback: string): Promi
   }
 }
 
-async function fetchClosed($: EngineInterface): Promise<IssueRow[]> {
-  const path = `repos/${OWNER}/${NAME}/issues?state=closed&sort=updated&direction=desc&per_page=${CLOSED_SAMPLE}`
+async function fetchClosed($: EngineInterface, repo: Repo): Promise<IssueRow[]> {
+  const path = `repos/${repo.owner}/${repo.name}/issues?state=closed&sort=updated&direction=desc&per_page=${CLOSED_SAMPLE}`
 
   return latestCompleted(JSON.parse(await run($, ['gh', 'api', path])) as GhIssue[])
 }
 
-async function learn($: EngineInterface, numbers: readonly number[], isFresh: boolean): Promise<void> {
+async function learn($: EngineInterface, repo: Repo, numbers: readonly number[], isFresh: boolean): Promise<void> {
   const wanted = [...new Set(numbers)].filter(number => isFresh || !known.has(number))
 
   if (wanted.length === 0) {
@@ -79,7 +81,7 @@ async function learn($: EngineInterface, numbers: readonly number[], isFresh: bo
   const fields = wanted
     .map(number => `i${number}: issueOrPullRequest(number: ${number}) { ... on Issue { number title state } }`)
     .join(' ')
-  const query = `{ repository(owner: "${OWNER}", name: "${NAME}") { ${fields} } }`
+  const query = `{ repository(owner: "${repo.owner}", name: "${repo.name}") { ${fields} } }`
   const reply = JSON.parse(await run($, ['gh', 'api', 'graphql', '-f', `query=${query}`])) as {
     data: { repository: Record<string, { number?: number; title?: string; state?: string } | null> }
   }
@@ -96,24 +98,30 @@ function rowOf(number: number): IssueRow {
 }
 
 async function refresh($: EngineInterface, isFresh: boolean): Promise<void> {
+  if (setup === null) {
+    return
+  }
+
+  const { repo, planFile, planHeading } = setup
+
   try {
     const cwd = await $.session.cwd()
     const branch = await run($, ['git', 'branch', '--show-current'], cwd)
     const root = mainWorktree(await run($, ['git', 'worktree', 'list', '--porcelain'], cwd)) ?? cwd
-    const resume = await readOr($, `${root}/RESUME-HERE.md`, '')
+    const plan = await readOr($, `${root}/${planFile}`, '')
     const held = await read($, focus)
 
     if (isFresh || closed === null) {
-      closed = await fetchClosed($)
+      closed = await fetchClosed($, repo)
     }
 
     const fromBranch = issueFromBranch(branch)
     const currentNumber = fromBranch ?? held.current
-    const planned = held.next.length > 0 ? held.next : nextStepsNumbers(resume)
+    const planned = held.next.length > 0 ? held.next : nextStepsNumbers(plan, planHeading)
     const past = closed
     const nextNumbers = upcoming(planned, [...past.map(row => row.number), ...(currentNumber === null ? [] : [currentNumber])])
 
-    await learn($, [...(currentNumber === null ? [] : [currentNumber]), ...nextNumbers], isFresh)
+    await learn($, repo, [...(currentNumber === null ? [] : [currentNumber]), ...nextNumbers], isFresh)
 
     const next = nextNumbers.filter(number => known.get(number)?.isOpen === true).map(rowOf)
     const refreshedAt = await $.clock.now()
@@ -123,7 +131,7 @@ async function refresh($: EngineInterface, isFresh: boolean): Promise<void> {
       current: currentNumber === null ? null : rowOf(currentNumber),
       next,
       currentFrom: fromBranch !== null ? 'branch' : held.current !== null ? 'session' : null,
-      nextFrom: held.next.length > 0 ? 'session' : planned.length > 0 ? 'resume' : null,
+      nextFrom: held.next.length > 0 ? 'session' : planned.length > 0 ? 'plan' : null,
       error: null,
       refreshedAt,
     }))
@@ -137,26 +145,29 @@ function soon($: EngineInterface, isFresh: boolean): void {
   $.clock.after(0, () => void refresh($, isFresh))
 }
 
-async function isVellumRepo($: EngineInterface): Promise<boolean> {
+async function githubRepo($: EngineInterface): Promise<Repo | null> {
   try {
-    const remote = await run($, ['git', 'remote', 'get-url', 'origin'], await $.session.cwd())
-
-    return remote.includes(`${OWNER}/${NAME}`)
+    return repoFromRemote(await run($, ['git', 'remote', 'get-url', 'origin'], await $.session.cwd()))
   } catch {
-    return false
+    return null
   }
 }
 
-export const register: Register = on => {
-  on('session.start', async ($, e, next) => {
-    isVellum = await isVellumRepo($)
+export const register: Register = (on, options) => {
+  const repos = Array.isArray(options.repos) ? options.repos : []
+  const planFile = typeof options.planFile === 'string' ? options.planFile : ''
+  const planHeading = typeof options.planHeading === 'string' ? options.planHeading : ''
 
-    if (isVellum) {
+  on('session.start', async ($, e, next) => {
+    const repo = await githubRepo($)
+    setup = repo !== null && isAllowed(repo, repos) ? { repo, planFile, planHeading } : null
+
+    if (setup !== null) {
       await $.command.register({ name: 'issue-dial', description: 'Show the issue dial: recently closed, in hand, next up' })
       await $.tool.register({
         name: TOOL,
         description:
-          "Updates Alex's issue-dial pane with the Vellum issue now being worked on and the issues suggested next, as this conversation has settled them. Call it when the issue in hand changes or when a next issue is agreed. `current` null and `next` empty hands both back to the branch name and RESUME-HERE.md.",
+          `Updates the user's issue-dial pane with the GitHub issue now being worked on in this repo and the issues suggested next, as this conversation has settled them. Call it when the issue in hand changes or when a next issue is agreed. \`current\` null and \`next\` empty hands both back to the branch name and ${planFile}.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -184,14 +195,14 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
 
-    if (isVellum && e.agentId === undefined) {
+    if (setup !== null && e.agentId === undefined) {
       soon($, false)
     }
 
     return done
   })
 
-  on('tool.call', { tool: 'mcp__issue-dial__set_focus' }, async ($, e) => {
+  on('tool.call', { tool: /^mcp__issue-dial__set_focus$/ }, async ($, e) => {
     const input = e as unknown as { current?: unknown; next?: unknown }
     const current = Number.isInteger(input.current) ? (input.current as number) : null
     const next = Array.isArray(input.next) ? input.next.filter((n): n is number => Number.isInteger(n)).slice(0, 5) : []
@@ -210,7 +221,7 @@ export const register: Register = on => {
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
 
-    if (!isVellum) {
+    if (setup === null) {
       return composed
     }
 
@@ -220,7 +231,7 @@ export const register: Register = on => {
         {
           id: 'issue-dial:focus',
           scope: 'session',
-          text: `Alex keeps an issue-dial pane open. When the Vellum issue in hand changes, or the two of you settle what comes next, call mcp__issue-dial__${TOOL} so it stays true. The branch name already sets the current issue while on an issue branch.`,
+          text: `The user keeps an issue-dial pane open for ${setup.repo.owner}/${setup.repo.name}. When the issue in hand changes, or you and the user settle what comes next, call mcp__issue-dial__${TOOL} so it stays true. The branch name already sets the current issue while on an issue branch.`,
         },
       ],
     }
@@ -260,7 +271,7 @@ export const register: Register = on => {
       )
     })
 
-    const sources = `now: ${state.currentFrom ?? 'none'} · next: ${state.nextFrom === 'resume' ? 'RESUME-HERE' : (state.nextFrom ?? 'none')}`
+    const sources = `now: ${state.currentFrom ?? 'none'} · next: ${state.nextFrom === 'plan' ? planFile : (state.nextFrom ?? 'none')}`
 
     return (
       <Box flexDirection="column">

@@ -15,11 +15,12 @@ const ISSUES: Record<number, { title: string; state: string }> = {
   733: { title: 'Closed since RESUME-HERE was written', state: 'CLOSED' },
 }
 
-const RESUME = '## Next steps, in order\n1. Alex picks (#638 continues; #727, #729, #733 are ready).\n'
+const RESUME = '## Next steps, in order\n1. Pick (#638 continues; #727, #729, #733 are ready).\n'
 
 function fakeRun(argv: readonly string[]): string {
   const joined = argv.join(' ')
 
+  if (joined === 'git remote get-url origin') return 'https://github.com/octo/widgets.git\n'
   if (joined === 'git branch --show-current') return 'main\n'
   if (joined === 'git worktree list --porcelain') return 'worktree /v\nHEAD 1\n'
   if (argv[1] === 'api' && argv[2] === 'graphql') {
@@ -51,12 +52,15 @@ const PANE = {
 
 test('the dial draws past above, the issue in hand bold between rules, next below', async ($, on) => {
   on('session.cwd', () => ({ value: '/v' }))
+  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  on('command.register', (_$, e) => ({ value: { command: e.name } }))
   on('fs.read', () => ({ value: RESUME }))
   on('clock.now', () => ({ value: 1 }))
   on('process.run', (_$, e) => ({
     value: { exitCode: 0, stdout: fakeRun(e.argv), stderr: '', isStdoutTruncated: false, isStderrTruncated: false },
   }))
 
+  await $.session.start({ cwd: '/v', surface: null, isInteractive: false })
   const answered = await $.tool.call({ tool: 'mcp__issue-dial__set_focus', current: 638, next: [] } as never)
 
   expect(JSON.stringify(answered)).toContain('now Issue #638 (from session), next Issue #727, Issue #729.')
@@ -81,11 +85,17 @@ test('the dial draws past above, the issue in hand bold between rules, next belo
   }
 })
 
-test('with no git or gh the pane says so instead of going blank', async ($, on) => {
+test('when gh fails the pane says so instead of going blank', async ($, on) => {
   on('session.cwd', () => ({ value: '/v' }))
-  on('process.run', () => ({
-    value: { exitCode: 128, stdout: '', stderr: 'not a git repository', isStdoutTruncated: false, isStderrTruncated: false },
-  }))
+  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  on('command.register', (_$, e) => ({ value: { command: e.name } }))
+  on('process.run', (_$, e) =>
+    e.argv.join(' ') === 'git remote get-url origin'
+      ? { value: { exitCode: 0, stdout: 'https://github.com/octo/widgets.git\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+      : { value: { exitCode: 4, stdout: '', stderr: 'gh auth login', isStdoutTruncated: false, isStderrTruncated: false } },
+  )
+
+  await $.session.start({ cwd: '/v', surface: null, isInteractive: false })
 
   await $.tool.call({ tool: 'mcp__issue-dial__set_focus', current: null, next: [] } as never)
 
@@ -93,6 +103,6 @@ test('with no git or gh the pane says so instead of going blank', async ($, on) 
   const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
 
   expect(texts).toContain('Nothing in hand')
-  expect(texts.some(text => text.includes('not a git repository'))).toBe(true)
+  expect(texts.some(text => text.includes('gh auth login'))).toBe(true)
   await ui.unmount()
 })

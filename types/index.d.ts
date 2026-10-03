@@ -2,7 +2,7 @@ export type IssueRow = { number: number; title: string }
 
 export type CurrentSource = 'branch' | 'session' | null
 
-export type NextSource = 'session' | 'resume' | null
+export type NextSource = 'session' | 'plan' | null
 
 export type Dial = {
   past: IssueRow[]

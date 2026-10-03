@@ -19,15 +19,33 @@ export type WheelRow = {
 
 export const REACH = 3
 
+export type Repo = { owner: string; name: string }
+
+const GITHUB_REMOTE =
+  /^(?:https:\/\/(?:[^@/]+@)?github\.com\/|git@github\.com:|ssh:\/\/git@github\.com(?::\d+)?\/)([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/
+
+export function repoFromRemote(url: string): Repo | null {
+  const [, owner, name] = GITHUB_REMOTE.exec(url.trim()) ?? []
+
+  return owner && name ? { owner, name } : null
+}
+
+export function isAllowed(repo: Repo, repos: readonly string[]): boolean {
+  const listed = repos.map(entry => entry.trim().toLowerCase()).filter(entry => entry !== '')
+
+  return listed.length === 0 || listed.includes(`${repo.owner}/${repo.name}`.toLowerCase())
+}
+
 export function issueFromBranch(branch: string): number | null {
   const match = /^(?:[\w.-]+\/)?(\d+)(?:-|$)/.exec(branch.trim())
 
   return match ? Number(match[1]) : null
 }
 
-export function nextStepsNumbers(resume: string): number[] {
-  const lines = resume.split('\n')
-  const start = lines.findIndex(line => /^##\s+Next steps/i.test(line))
+export function nextStepsNumbers(plan: string, heading: string): number[] {
+  const wanted = heading.trim().toLowerCase()
+  const lines = plan.split('\n')
+  const start = lines.findIndex(line => /^##\s/.test(line) && line.replace(/^##\s+/, '').toLowerCase().startsWith(wanted))
 
   if (start === -1) {
     return []
