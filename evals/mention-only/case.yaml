@@ -2,12 +2,12 @@ schema_version: "1.1"
 name: mention-only
 description: An issue is discussed but not taken up, so set_focus is not called.
 context:
-  scaffold_script: vellum-origin.sh
+  scaffold_script: origin.sh
 execution:
   max_turns: 6
   allowed_tools: [mcp__issue-dial__set_focus]
   prompt: |
-    Just curious, not switching to it: Issue #711 is titled "The CLI's --land check lets a non-number through and draws a chart from it". In one paragraph, what kind of fix does that title suggest?
+    Just curious, not switching to it: Issue #63 is titled "Search crashes when the query is empty". In one paragraph, what kind of fix does that title suggest?
 graders:
   - name: not-called
     type: tool_used

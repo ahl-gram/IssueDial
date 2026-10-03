@@ -2,12 +2,12 @@ schema_version: "1.1"
 name: hand-back
 description: Nothing is in hand or queued, so set_focus hands both back with current null and next empty.
 context:
-  scaffold_script: vellum-origin.sh
+  scaffold_script: origin.sh
 execution:
   max_turns: 6
   allowed_tools: [mcp__issue-dial__set_focus]
   prompt: |
-    That's it for issue work today: Issue #733 is parked, nothing is in hand and nothing is queued next. Wrap up in one sentence.
+    That's it for issue work today: Issue #42 is parked, nothing is in hand and nothing is queued next. Wrap up in one sentence.
 graders:
   - name: current-null
     type: tool_used

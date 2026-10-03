@@ -2,14 +2,14 @@ schema_version: "1.1"
 name: agree-next
 description: A next-up order is agreed, so set_focus carries it in that order.
 context:
-  scaffold_script: vellum-origin.sh
+  scaffold_script: origin.sh
 execution:
   max_turns: 6
   allowed_tools: [mcp__issue-dial__set_focus]
   prompt: |
-    We're working on Issue #733. Once it ships, let's do Issue #728 and then Issue #711. Agreed? Answer in one sentence.
+    We're working on Issue #42. Once it ships, let's do Issue #57 and then Issue #63. Agreed? Answer in one sentence.
 graders:
-  - name: next-is-728-then-711
+  - name: next-is-57-then-63
     type: tool_used
     tool: mcp__issue-dial__set_focus
-    input_match: '"next"\s*:\s*\[\s*728\s*,\s*711\s*\]'
+    input_match: '"next"\s*:\s*\[\s*57\s*,\s*63\s*\]'

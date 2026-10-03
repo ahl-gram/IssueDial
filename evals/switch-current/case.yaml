@@ -2,14 +2,14 @@ schema_version: "1.1"
 name: switch-current
 description: The issue in hand changes, so set_focus names the new one as current.
 context:
-  scaffold_script: vellum-origin.sh
+  scaffold_script: origin.sh
 execution:
   max_turns: 6
   allowed_tools: [mcp__issue-dial__set_focus]
   prompt: |
-    Issue #729 is merged and closed. Let's pick up Issue #733 now. Give me a two-line plan for how you'd start it.
+    Issue #41 is merged and closed. Let's pick up Issue #42 now. Give me a two-line plan for how you'd start it.
 graders:
-  - name: current-is-733
+  - name: current-is-42
     type: tool_used
     tool: mcp__issue-dial__set_focus
-    input_match: '"current"\s*:\s*733'
+    input_match: '"current"\s*:\s*42'

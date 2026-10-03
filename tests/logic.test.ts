@@ -28,7 +28,7 @@ test('next issues are the Next steps section, in order, without PR numbers', asy
     '- ready: **Issue #727**',
     '',
     '## Next steps, in order',
-    '1. Alex picks the next lanes (#638 continues the epic; #727, #729, #733 are ready).',
+    '1. Pick the next lanes (#638 continues the epic; #727, #729, #733 are ready).',
     '2. Rebase PR #739, then #638 again.',
     '',
     '## Try it',
@@ -67,9 +67,9 @@ test('an empty repo list allows every repo, a listed one only those, ignoring ca
 })
 
 test('the main checkout is the first worktree listed', async () => {
-  const porcelain = 'worktree /a/Vellum\nHEAD 1\nbranch refs/heads/main\n\nworktree /a/Vellum/.claude/worktrees/x\n'
+  const porcelain = 'worktree /a/repo\nHEAD 1\nbranch refs/heads/main\n\nworktree /a/repo/.claude/worktrees/x\n'
 
-  expect(mainWorktree(porcelain)).toBe('/a/Vellum')
+  expect(mainWorktree(porcelain)).toBe('/a/repo')
   expect(mainWorktree('')).toBe(null)
 })
 
