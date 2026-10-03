@@ -146,3 +146,19 @@ test(
     await ui.unmount()
   },
 )
+
+test('a repo list saved as one string still limits the dial', { options: { repos: 'octo/gadgets' as never } }, async ($, on) => {
+  const seen = fake(on, 'https://github.com/octo/widgets.git')
+
+  await $.session.start(START)
+
+  expect(seen.tools).toEqual([])
+})
+
+test('a repo list saved as one comma-separated string names each repo', { options: { repos: 'octo/gadgets, octo/widgets' as never } }, async ($, on) => {
+  const seen = fake(on, 'https://github.com/octo/widgets.git')
+
+  await $.session.start(START)
+
+  expect(seen.tools).toEqual(['set_focus'])
+})

@@ -30,6 +30,14 @@ export function repoFromRemote(url: string): Repo | null {
   return owner && name ? { owner, name } : null
 }
 
+export function repoList(value: unknown): string[] {
+  if (typeof value === 'string') {
+    return value.split(/[\s,]+/)
+  }
+
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
+}
+
 export function isAllowed(repo: Repo, repos: readonly string[]): boolean {
   const listed = repos.map(entry => entry.trim().toLowerCase()).filter(entry => entry !== '')
 

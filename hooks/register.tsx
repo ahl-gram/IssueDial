@@ -13,6 +13,7 @@ import {
   isAllowed,
   nextStepsNumbers,
   repoFromRemote,
+  repoList,
   upcoming,
 } from './logic'
 import type { GhIssue, Repo } from './logic'
@@ -154,7 +155,7 @@ async function githubRepo($: EngineInterface): Promise<Repo | null> {
 }
 
 export const register: Register = (on, options) => {
-  const repos = Array.isArray(options.repos) ? options.repos : []
+  const repos = repoList(options.repos)
   const planFile = typeof options.planFile === 'string' ? options.planFile : ''
   const planHeading = typeof options.planHeading === 'string' ? options.planHeading : ''
 
