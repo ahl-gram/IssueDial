@@ -1,0 +1,4 @@
+.claude-plugin/types/
+evals/results/
+node_modules/
+.DS_Store

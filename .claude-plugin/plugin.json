@@ -1,0 +1,6 @@
+{
+  "name": "issue-dial",
+  "version": "0.1.0",
+  "description": "A picker-wheel pane for Vellum: the last three closed issues above, the issue in hand in the middle, the suggested next ones below.",
+  "types": "./types/index.d.ts"
+}

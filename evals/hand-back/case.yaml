@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: hand-back
+description: Nothing is in hand or queued, so set_focus hands both back with current null and next empty.
+context:
+  scaffold_script: vellum-origin.sh
+execution:
+  max_turns: 6
+  allowed_tools: [mcp__issue-dial__set_focus]
+  prompt: |
+    That's it for issue work today: Issue #733 is parked, nothing is in hand and nothing is queued next. Wrap up in one sentence.
+graders:
+  - name: current-null
+    type: tool_used
+    tool: mcp__issue-dial__set_focus
+    input_match: '"current"\s*:\s*null'
+  - name: next-empty
+    type: tool_used
+    tool: mcp__issue-dial__set_focus
+    input_match: '"next"\s*:\s*\[\s*\]'
