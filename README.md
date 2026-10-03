@@ -54,3 +54,7 @@ claude plugin validate .                           # the marketplace manifest
 ```
 
 To type-check, load the mod once (`claude --plugin-dir .`) so Claude Code writes `.claude-plugin/types/`, then run `tsc -p . --noEmit`. The eval suite and the command that runs it are in [evals/README.md](evals/README.md).
+
+## License
+
+MIT, see [LICENSE](LICENSE).
