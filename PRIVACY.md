@@ -1,6 +1,6 @@
 # issue-dial privacy policy
 
-Effective 2026-10-03.
+Effective 2026-10-03, revised the same day to say what the GitHub requests carry.
 
 issue-dial is a Claude Code mod that runs on your own machine. Its author runs no server for it and receives nothing from it: no analytics, no telemetry, no crash reports.
 
@@ -14,7 +14,9 @@ issue-dial is a Claude Code mod that runs on your own machine. Its author runs n
 Through your own signed-in GitHub CLI (`gh`), and only in a repo where the dial is turned on, it reads from `api.github.com`:
 
 - the repo's 50 most recently closed issues, at session start, every five minutes, and when you press Refresh
-- the title and state of the issue numbers shown on the dial
+- the title and state of the issue numbers shown on the dial, at those times and after one of Claude's turns when an issue on the dial has not been looked up yet
+
+The requests carry the repo's `owner/name` and the issue numbers on the dial, which come from the branch name, the plan section of the plan file, or Claude's `set_focus` calls. Nothing else read on your machine is sent: not the rest of the plan file, not other files, not your conversation.
 
 These requests are read-only and carry your own GitHub credentials, so GitHub's own privacy statement covers them. The mod never writes to GitHub.
 

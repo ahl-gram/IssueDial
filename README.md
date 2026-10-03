@@ -18,9 +18,27 @@ Claude keeps it current. The mod gives Claude a `set_focus` tool and one line in
 
 The plan file is optional. By default the dial reads `RESUME-HERE.md` at the root of the main checkout and takes every `#123` under the `## Next steps` heading, skipping `PR #123`. A missing file just means nothing is queued until Claude sets it.
 
-## Data and privacy
+## What it runs, and what leaves your machine
 
-The mod runs on your machine and its author receives nothing from it. In a repo where the dial is on, it reads three things from `git` and your plan file locally, and calls GitHub's API through your own signed-in `gh`: read-only requests for the recently closed issues and the titles of the issues on the dial. Claude sees one prompt sentence naming the repo and the tool's replies, which list issue numbers; issue titles stay in the pane. The details are in [PRIVACY.md](PRIVACY.md).
+**Programs.** The mod runs five commands, all through one helper (`run()` in `hooks/register.tsx`), in the session's folder, each with a 20 second timeout:
+
+| Command | Why |
+|---|---|
+| `git remote get-url origin` | at session start, to learn the repo's `owner/name` and decide whether the dial turns on |
+| `git branch --show-current` | to take the issue in hand from a branch like `123-slug` |
+| `git worktree list --porcelain` | to find the main checkout, where the plan file lives |
+| `gh api repos/<owner>/<name>/issues?state=closed&sort=updated&direction=desc&per_page=50` | the recently closed issues for the top of the dial |
+| `gh api graphql -f query=<query>` | one read-only query for the number, title and state of each issue on the dial: `{ repository(owner: "<owner>", name: "<name>") { i42: issueOrPullRequest(number: 42) { ... on Issue { number title state } } } }`, one `iN` entry per issue |
+
+`<owner>`, `<name>` and the issue numbers are the only parts filled in at run time. It runs nothing else.
+
+**Where data goes.** The only destination is `api.github.com`, through your own signed-in `gh`, and only in a repo where the dial is on: at session start, every five minutes and on Refresh, plus a title lookup after one of Claude's turns when the dial shows an issue it has not looked up yet. The requests carry the repo's `owner/name` and the issue numbers on the dial, which come from the branch name, the plan section of the plan file, or Claude's `set_focus` calls. Nothing else read locally is sent: not the rest of the plan file, not other files, not your conversation.
+
+**Conversation.** The mod hooks `turn.complete` only to refresh the dial when one of Claude's own turns ends (not a subagent's). It reads no conversation text. It adds one sentence to Claude's system prompt naming the repo as `owner/name`, and its tool's replies list issue numbers. Issue titles stay in the pane.
+
+**The one tool it answers.** The mod registers its own tool, `set_focus` (Claude sees it as `mcp__issue-dial__set_focus`), and serves it from a `tool.call` hook matched to that tool's name alone. That is how a mod implements a tool it registers; no other tool's calls reach the hook.
+
+The privacy policy is [PRIVACY.md](PRIVACY.md).
 
 ## Requirements
 

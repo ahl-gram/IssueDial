@@ -203,7 +203,7 @@ export const register: Register = (on, options) => {
     return done
   })
 
-  on('tool.call', { tool: /^mcp__issue-dial__set_focus$/ }, async ($, e) => {
+  on('tool.call', { tool: 'mcp__issue-dial__set_focus' }, async ($, e) => {
     const input = e as unknown as { current?: unknown; next?: unknown }
     const current = Number.isInteger(input.current) ? (input.current as number) : null
     const next = Array.isArray(input.next) ? input.next.filter((n): n is number => Number.isInteger(n)).slice(0, 5) : []
