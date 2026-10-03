@@ -1,10 +1,22 @@
 {
   "name": "issue-dial",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A picker-wheel pane for a GitHub repo's issues: the last three closed above, the issue in hand in the middle, the suggested next ones below.",
   "author": {
-    "name": "Alexander Lee"
+    "name": "Alexander Lee",
+    "url": "https://github.com/ahl-gram"
   },
+  "license": "MIT",
+  "icon": "./assets/icon.png",
+  "homepage": "https://github.com/ahl-gram/IssueDial",
+  "repository": "https://github.com/ahl-gram/IssueDial",
+  "keywords": [
+    "github",
+    "issues",
+    "pane",
+    "workflow"
+  ],
+  "privacyPolicyUrl": "https://github.com/ahl-gram/IssueDial/blob/main/PRIVACY.md",
   "types": "./types/index.d.ts",
   "userConfig": {
     "repos": {

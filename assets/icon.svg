@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="104" fill="#0d1117"/>
+  <g fill="none" stroke-linecap="round" transform="translate(0 -6)">
+    <circle cx="196" cy="74" r="10" stroke="#83749e" stroke-width="5"/>
+    <line x1="222" y1="74" x2="352" y2="74" stroke="#83749e" stroke-width="14"/>
+    <circle cx="170" cy="134" r="13" stroke="#8569b8" stroke-width="6"/>
+    <line x1="202" y1="134" x2="378" y2="134" stroke="#8569b8" stroke-width="18"/>
+    <circle cx="146" cy="196" r="16" stroke="#8957e5" stroke-width="7"/>
+    <line x1="184" y1="196" x2="402" y2="196" stroke="#8957e5" stroke-width="22"/>
+    <line x1="56" y1="226" x2="456" y2="226" stroke="#8b949e" stroke-width="4" opacity="0.55"/>
+    <circle cx="122" cy="262" r="22" stroke="#3fb950" stroke-width="9"/>
+    <circle cx="122" cy="262" r="7" fill="#3fb950" stroke="none"/>
+    <line x1="170" y1="262" x2="428" y2="262" stroke="#3fb950" stroke-width="30"/>
+    <line x1="56" y1="298" x2="456" y2="298" stroke="#8b949e" stroke-width="4" opacity="0.55"/>
+    <circle cx="146" cy="330" r="16" stroke="#2da44e" stroke-width="7"/>
+    <line x1="184" y1="330" x2="402" y2="330" stroke="#2da44e" stroke-width="22"/>
+    <circle cx="170" cy="392" r="13" stroke="#529465" stroke-width="6"/>
+    <line x1="202" y1="392" x2="378" y2="392" stroke="#529465" stroke-width="18"/>
+    <circle cx="196" cy="450" r="10" stroke="#678b71" stroke-width="5"/>
+    <line x1="222" y1="450" x2="352" y2="450" stroke="#678b71" stroke-width="14"/>
+  </g>
+</svg>

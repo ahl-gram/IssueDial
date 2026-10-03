@@ -18,6 +18,10 @@ Claude keeps it current. The mod gives Claude a `set_focus` tool and one line in
 
 The plan file is optional. By default the dial reads `RESUME-HERE.md` at the root of the main checkout and takes every `#123` under the `## Next steps` heading, skipping `PR #123`. A missing file just means nothing is queued until Claude sets it.
 
+## Data and privacy
+
+The mod runs on your machine and its author receives nothing from it. In a repo where the dial is on, it reads three things from `git` and your plan file locally, and calls GitHub's API through your own signed-in `gh`: read-only requests for the recently closed issues and the titles of the issues on the dial. Claude sees one prompt sentence naming the repo and the tool's replies, which list issue numbers; issue titles stay in the pane. The details are in [PRIVACY.md](PRIVACY.md).
+
 ## Requirements
 
 - A Claude Code build with mods (tested on 2.1.288)
