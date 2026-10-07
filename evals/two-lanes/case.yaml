@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: two-lanes
+description: Two issues are worked in parallel, so set_focus carries two columns, one per issue in hand, in the order named.
+context:
+  scaffold_script: origin.sh
+execution:
+  max_turns: 6
+  allowed_tools: [mcp__issue-dial__set_focus]
+  prompt: |
+    I'm starting two parallel lanes now: one on Issue #42 and one on Issue #57. Issue #63 can follow #42 once it lands. Acknowledge in one sentence.
+graders:
+  - name: two-columns-42-then-57
+    type: tool_used
+    tool: mcp__issue-dial__set_focus
+    input_match: '"columns".*"current"\s*:\s*42\b.*"current"\s*:\s*57\b'

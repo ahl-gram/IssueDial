@@ -1,38 +1,36 @@
 # issue-dial
 
-A Claude Code mod that keeps a small pane open beside your session, showing where you are in a GitHub repo's issues:
+A Claude Code mod that keeps a small pane open beside your session, showing where you are in a GitHub repo's issues. It holds up to three columns side by side, one per issue in hand, so a session running parallel lanes shows each lane:
 
-- **above**, the three issues most recently closed as completed, fading with age
-- **in the middle**, the issue in hand, bold between two rules
-- **below**, up to three open issues suggested next
+- **at the top of each column**, the issue in hand, bold between two rules
+- **below it**, up to three open issues suggested to follow it, fading with distance
 
-Claude keeps it current. The mod gives Claude a `set_focus` tool and one line in its system prompt asking it to call that tool when the issue in hand changes or when the two of you agree what comes next.
+Claude keeps it current. The mod gives Claude a `set_focus` tool and one line in its system prompt asking it to call that tool when an issue in hand changes, a lane starts or ends, or the two of you agree what comes next. Claude picks each column's next issues the way it would suggest parallel pairings: ones that could follow that column's issue without colliding with what the other columns have in hand.
 
 ## Where the numbers come from
 
-| Slot | Source, first match wins |
+| Slot | Source |
 |---|---|
-| In hand | the branch name (`123-slug` or `feat/123-slug`), then what Claude last set |
-| Next | what Claude last set, then the issue numbers in the plan section of your plan file |
-| Closed | `gh api`, refreshed every five minutes and on the pane's Refresh button |
+| The columns | what Claude last set, up to three; with none set, one column built from the two rows below |
+| In hand, with no columns set | the branch name (`123-slug` or `feat/123-slug`) |
+| Next, with one column and no next of its own | the issue numbers in the plan section of your plan file |
 
-The plan file is optional. By default the dial reads `RESUME-HERE.md` at the root of the main checkout and takes every `#123` under the `## Next steps` heading, skipping `PR #123`. A missing file just means nothing is queued until Claude sets it.
+Each column leaves out any issue another column has in hand, and any issue that is no longer open. The plan file is optional. By default the dial reads `RESUME-HERE.md` at the root of the main checkout and takes every `#123` under the `## Next steps` heading, skipping `PR #123`. A missing file just means nothing is queued until Claude sets it.
 
 ## What it runs, and what leaves your machine
 
-**Programs.** The mod runs five commands, all through one helper (`run()` in `hooks/register.tsx`), in the session's folder, each with a 20 second timeout:
+**Programs.** The mod runs four commands, all through one helper (`run()` in `hooks/register.tsx`), in the session's folder, each with a 20 second timeout:
 
 | Command | Why |
 |---|---|
 | `git remote get-url origin` | at session start, to learn the repo's `owner/name` and decide whether the dial turns on |
 | `git branch --show-current` | to take the issue in hand from a branch like `123-slug` |
 | `git worktree list --porcelain` | to find the main checkout, where the plan file lives |
-| `gh api repos/<owner>/<name>/issues?state=closed&sort=updated&direction=desc&per_page=50` | the recently closed issues for the top of the dial |
 | `gh api graphql -f query=<query>` | one read-only query for the number, title and state of each issue on the dial: `{ repository(owner: "<owner>", name: "<name>") { i42: issueOrPullRequest(number: 42) { ... on Issue { number title state } } } }`, one `iN` entry per issue |
 
 `<owner>`, `<name>` and the issue numbers are the only parts filled in at run time. It runs nothing else.
 
-**Where data goes.** The only destination is `api.github.com`, through your own signed-in `gh`, and only in a repo where the dial is on: at session start, every five minutes and on Refresh, plus a title lookup after one of Claude's turns when the dial shows an issue it has not looked up yet. The requests carry the repo's `owner/name` and the issue numbers on the dial, which come from the branch name, the plan section of the plan file, or Claude's `set_focus` calls. Nothing else read locally is sent: not the rest of the plan file, not other files, not your conversation.
+**Where data goes.** The only destination is `api.github.com`, through your own signed-in `gh`, and only in a repo where the dial is on: a title and state lookup for the issues on the dial at session start, every five minutes and on Refresh, plus one after one of Claude's turns when the dial shows an issue it has not looked up yet. The requests carry the repo's `owner/name` and the issue numbers on the dial, which come from the branch name, the plan section of the plan file, or Claude's `set_focus` calls. Nothing else read locally is sent: not the rest of the plan file, not other files, not your conversation.
 
 **Conversation.** The mod hooks `turn.complete` only to refresh the dial when one of Claude's own turns ends (not a subagent's). It reads no conversation text. It adds one sentence to Claude's system prompt naming the repo as `owner/name`, and its tool's replies list issue numbers. Issue titles stay in the pane.
 

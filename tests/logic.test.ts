@@ -1,12 +1,14 @@
 import { expect, test } from 'claude-code/testing'
 
 import {
+  MAX_COLUMNS,
   buildWheel,
+  columnsOf,
+  heldColumns,
   fadeOf,
   fadedColor,
   isAllowed,
   issueFromBranch,
-  latestCompleted,
   mainWorktree,
   nextStepsNumbers,
   repoFromRemote,
@@ -73,36 +75,46 @@ test('the main checkout is the first worktree listed', async () => {
   expect(mainWorktree('')).toBe(null)
 })
 
-test('past is the three most recently closed-as-completed issues, by close date', async () => {
-  const issues = [
-    { number: 1, title: 'old but just commented', state: 'closed', state_reason: 'completed', closed_at: '2026-09-01T00:00:00Z' },
-    { number: 2, title: 'pr', state: 'closed', state_reason: null, closed_at: '2026-10-03T09:00:00Z', pull_request: {} },
-    { number: 3, title: 'dropped', state: 'closed', state_reason: 'not_planned', closed_at: '2026-10-03T08:00:00Z' },
-    { number: 4, title: 'c', state: 'closed', state_reason: 'completed', closed_at: '2026-10-02T00:00:00Z' },
-    { number: 5, title: 'a', state: 'closed', state_reason: 'completed', closed_at: '2026-10-03T07:00:00Z' },
-    { number: 6, title: 'b', state: 'closed', state_reason: 'completed', closed_at: '2026-10-03T06:00:00Z' },
-  ]
-
-  expect(latestCompleted(issues).map(row => row.number)).toEqual([5, 6, 4])
-})
-
-test('next drops the issue in hand and anything already closed above it', async () => {
+test('next drops every column\'s issue in hand', async () => {
   expect(upcoming([638, 727, 668, 729], [668, 675, 638])).toEqual([727, 729])
 })
 
-test('the wheel reads oldest past at the top, now in the middle, nearest next first', async () => {
+test('the columns are the ones the session set, at most three, else one from the branch and the plan; a lone column with no next takes the plan', async () => {
+  const set = [
+    { current: 801, next: [391, 785] },
+    { current: 764, next: [765] },
+  ]
+  const four = [...set, { current: 1, next: [] }, { current: 2, next: [] }]
+
+  expect(columnsOf(set, 42, [57])).toEqual(set)
+  expect(columnsOf(four, null, []).map(column => column.current)).toEqual([801, 764, 1])
+  expect(MAX_COLUMNS).toBe(3)
+  expect(columnsOf([], 42, [57, 63])).toEqual([{ current: 42, next: [57, 63] }])
+  expect(columnsOf([], null, [])).toEqual([{ current: null, next: [] }])
+  expect(columnsOf([{ current: 42, next: [] }], null, [57])).toEqual([{ current: 42, next: [57] }])
+  expect(columnsOf([{ current: 42, next: [] }, { current: 7, next: [8] }], null, [57])).toEqual([
+    { current: 42, next: [] },
+    { current: 7, next: [8] },
+  ])
+})
+
+test('a focus saved before columns existed reads as no columns', async () => {
+  expect(heldColumns({ current: 801, next: [764] })).toEqual([])
+  expect(heldColumns(undefined)).toEqual([])
+  expect(heldColumns({ columns: [{ current: 801, next: [785] }] })).toEqual([{ current: 801, next: [785] }])
+})
+
+test('a column reads the issue in hand at the top, nearest next first, and nothing above it', async () => {
   const row = (number: number) => ({ number, title: `t${number}` })
-  const wheel = buildWheel([row(668), row(675), row(621), row(1)], row(638), [row(727), row(729)])
+  const wheel = buildWheel(row(638), [row(727), row(729), row(733), row(1)])
 
   expect(wheel.map(slot => [slot.kind, slot.row?.number, slot.distance])).toEqual([
-    ['past', 621, 3],
-    ['past', 675, 2],
-    ['past', 668, 1],
     ['current', 638, 0],
     ['next', 727, 1],
     ['next', 729, 2],
+    ['next', 733, 3],
   ])
-  expect(buildWheel([], null, [])).toEqual([{ kind: 'current', distance: 0, row: null }])
+  expect(buildWheel(null, [])).toEqual([{ kind: 'current', distance: 0, row: null }])
   expect([0, 1, 2, 3].map(fadeOf)).toEqual(['center', 'near', 'far', 'far'])
 })
 

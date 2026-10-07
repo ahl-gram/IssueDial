@@ -1,23 +1,16 @@
-import type { IssueRow } from '../types'
-
-export type GhIssue = {
-  number: number
-  title: string
-  state: string
-  state_reason?: string | null
-  closed_at?: string | null
-  pull_request?: unknown
-}
+import type { ColumnFocus, IssueRow } from '../types'
 
 export type Fade = 'center' | 'near' | 'far'
 
 export type WheelRow = {
-  kind: 'past' | 'current' | 'next'
+  kind: 'current' | 'next'
   distance: number
   row: IssueRow | null
 }
 
 export const REACH = 3
+
+export const MAX_COLUMNS = 3
 
 export type Repo = { owner: string; name: string }
 
@@ -73,26 +66,32 @@ export function mainWorktree(porcelain: string): string | null {
   return first ? first.slice('worktree '.length) : null
 }
 
-export function latestCompleted(issues: readonly GhIssue[], count = REACH): IssueRow[] {
-  return issues
-    .filter(issue => issue.pull_request === undefined && issue.state_reason === 'completed' && issue.closed_at)
-    .toSorted((a, b) => (b.closed_at ?? '').localeCompare(a.closed_at ?? ''))
-    .slice(0, count)
-    .map(({ number, title }) => ({ number, title }))
-}
-
 export function upcoming(numbers: readonly number[], exclude: readonly number[]): number[] {
   return numbers.filter(number => !exclude.includes(number))
 }
 
-export function buildWheel(past: readonly IssueRow[], current: IssueRow | null, next: readonly IssueRow[]): WheelRow[] {
-  const above = past
-    .slice(0, REACH)
-    .map((row, index): WheelRow => ({ kind: 'past', distance: index + 1, row }))
-    .toReversed()
+export function heldColumns(focus: unknown): ColumnFocus[] {
+  const columns = (focus as { columns?: unknown } | undefined)?.columns
+
+  return Array.isArray(columns) ? (columns as ColumnFocus[]) : []
+}
+
+export function usesPlan(held: readonly ColumnFocus[]): boolean {
+  return held.length === 0 || (held.length === 1 && held[0]?.next.length === 0)
+}
+
+export function columnsOf(held: readonly ColumnFocus[], fromBranch: number | null, planned: readonly number[]): ColumnFocus[] {
+  if (held.length === 0) {
+    return [{ current: fromBranch, next: [...planned] }]
+  }
+
+  return held.slice(0, MAX_COLUMNS).map(column => (usesPlan(held) ? { ...column, next: [...planned] } : column))
+}
+
+export function buildWheel(current: IssueRow | null, next: readonly IssueRow[]): WheelRow[] {
   const below = next.slice(0, REACH).map((row, index): WheelRow => ({ kind: 'next', distance: index + 1, row }))
 
-  return [...above, { kind: 'current', distance: 0, row: current }, ...below]
+  return [{ kind: 'current', distance: 0, row: current }, ...below]
 }
 
 export function fadeOf(distance: number): Fade {
@@ -118,3 +117,4 @@ export function fadedColor(hex: string, distance: number): string {
 export function drumIndent(distance: number): string {
   return ' '.repeat(Math.max(0, distance - 1))
 }
+

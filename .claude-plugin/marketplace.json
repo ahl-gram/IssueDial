@@ -3,12 +3,12 @@
   "owner": {
     "name": "Alexander Lee"
   },
-  "description": "One plugin: issue-dial, a live pane for the GitHub issue in hand and what comes next.",
+  "description": "One plugin: issue-dial, a live pane for the GitHub issues in hand and what could follow each.",
   "plugins": [
     {
       "name": "issue-dial",
       "source": "./",
-      "description": "A picker-wheel pane for a GitHub repo's issues: the last three closed above, the issue in hand in the middle, the suggested next ones below."
+      "description": "A pane for a GitHub repo's issues: up to three columns, one per issue in hand (one per parallel lane), each with the issues suggested to follow it."
     }
   ]
 }

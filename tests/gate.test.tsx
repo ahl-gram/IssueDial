@@ -57,7 +57,6 @@ function fake(on: Parameters<TestBody>[1], origin: string, plan = ''): Fake {
 
       return ok(JSON.stringify({ data: { repository } }))
     }
-    if (e.argv[1] === 'api') return ok('[]')
 
     throw new Error(`unexpected ${joined}`)
   })
@@ -93,9 +92,9 @@ test('with no repo list the dial turns on in any GitHub repo and reads that repo
   expect(text).not.toMatch(/Alex|Vellum/)
   expect(seen.tools).toEqual(['set_focus'])
 
-  await $.tool.call({ tool: 'mcp__issue-dial__set_focus', current: 42, next: [] } as never)
+  await $.tool.call({ tool: 'mcp__issue-dial__set_focus', columns: [{ current: 42, next: [] }] } as never)
 
-  expect(seen.calls.some(call => call.includes('repos/octo/widgets/issues'))).toBe(true)
+  expect(seen.calls.some(call => call.includes('repos/octo/widgets/issues'))).toBe(false)
   expect(seen.calls.some(call => call.includes('owner: "octo", name: "widgets"'))).toBe(true)
   expect(seen.calls.some(call => call.includes('Vellum'))).toBe(false)
 })
@@ -134,7 +133,7 @@ test(
     const seen = fake(on, 'https://github.com/octo/widgets.git', '## Next steps\n#99\n\n## Up next\n1. #57\n')
 
     await $.session.start(START)
-    const answered = await $.tool.call({ tool: 'mcp__issue-dial__set_focus', current: 42, next: [] } as never)
+    const answered = await $.tool.call({ tool: 'mcp__issue-dial__set_focus', columns: [{ current: 42, next: [] }] } as never)
 
     expect(seen.reads).toContain('/w/PLAN.md')
     expect(JSON.stringify(answered)).toContain('now Issue #42 (from session), next Issue #57.')

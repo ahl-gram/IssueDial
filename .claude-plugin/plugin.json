@@ -1,7 +1,7 @@
 {
   "name": "issue-dial",
-  "version": "0.2.2",
-  "description": "A picker-wheel pane for a GitHub repo's issues: the last three closed above, the issue in hand in the middle, the suggested next ones below.",
+  "version": "0.3.0",
+  "description": "A pane for a GitHub repo's issues: up to three columns, one per issue in hand (one per parallel lane), each with the issues suggested to follow it.",
   "author": {
     "name": "Alexander Lee",
     "url": "https://github.com/ahl-gram"

@@ -1,36 +1,37 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Dial, Focus, IssueRow } from '../types'
+import type { Column, ColumnFocus, Dial, Focus, IssueRow } from '../types'
 import {
+  MAX_COLUMNS,
   buildWheel,
+  columnsOf,
   drumIndent,
   fadeOf,
   fadedColor,
+  heldColumns,
   issueFromBranch,
-  latestCompleted,
   mainWorktree,
   isAllowed,
   nextStepsNumbers,
   repoFromRemote,
   repoList,
   upcoming,
+  usesPlan,
 } from './logic'
-import type { GhIssue, Repo } from './logic'
+import type { Repo } from './logic'
 
 const PANE = 'issue-dial'
 const TITLE = 'Issue dial'
 const TOOL = 'set_focus'
 const GITHUB_EVERY_MS = 5 * 60_000
-const CLOSED_SAMPLE = 50
-const PANE_ROWS = 12
-const CLOSED_PURPLE = '#8957e5'
+const PANE_ROWS = 8
+const COLUMN_GAP = 2
 const OPEN_GREEN = '#2da44e'
+const NO_COLUMN: Column = { current: null, next: [] }
 
 const EMPTY: Dial = {
-  past: [],
-  current: null,
-  next: [],
+  columns: [],
   currentFrom: null,
   nextFrom: null,
   error: null,
@@ -38,14 +39,13 @@ const EMPTY: Dial = {
 }
 
 const dial = atom({ plugin: 'issue-dial', key: 'dial' } as const, EMPTY)
-const focus = atom({ plugin: 'issue-dial', key: 'focus' } as const, { current: null, next: [] } as Focus)
+const focus = atom({ plugin: 'issue-dial', key: 'focus' } as const, { columns: [] } as Focus)
 
 type Known = { title: string; isOpen: boolean }
 
 type Setup = { repo: Repo; planFile: string; planHeading: string }
 
 let setup: Setup | null = null
-let closed: IssueRow[] | null = null
 const known = new Map<number, Known>()
 
 async function run($: EngineInterface, argv: string[], cwd?: string): Promise<string> {
@@ -64,12 +64,6 @@ async function readOr($: EngineInterface, path: string, fallback: string): Promi
   } catch {
     return fallback
   }
-}
-
-async function fetchClosed($: EngineInterface, repo: Repo): Promise<IssueRow[]> {
-  const path = `repos/${repo.owner}/${repo.name}/issues?state=closed&sort=updated&direction=desc&per_page=${CLOSED_SAMPLE}`
-
-  return latestCompleted(JSON.parse(await run($, ['gh', 'api', path])) as GhIssue[])
 }
 
 async function learn($: EngineInterface, repo: Repo, numbers: readonly number[], isFresh: boolean): Promise<void> {
@@ -110,29 +104,25 @@ async function refresh($: EngineInterface, isFresh: boolean): Promise<void> {
     const branch = await run($, ['git', 'branch', '--show-current'], cwd)
     const root = mainWorktree(await run($, ['git', 'worktree', 'list', '--porcelain'], cwd)) ?? cwd
     const plan = await readOr($, `${root}/${planFile}`, '')
-    const held = await read($, focus)
-
-    if (isFresh || closed === null) {
-      closed = await fetchClosed($, repo)
-    }
-
+    const held = heldColumns(await read($, focus))
     const fromBranch = issueFromBranch(branch)
-    const currentNumber = fromBranch ?? held.current
-    const planned = held.next.length > 0 ? held.next : nextStepsNumbers(plan, planHeading)
-    const past = closed
-    const nextNumbers = upcoming(planned, [...past.map(row => row.number), ...(currentNumber === null ? [] : [currentNumber])])
+    const planned = nextStepsNumbers(plan, planHeading)
+    const columns = columnsOf(held, fromBranch, planned)
+    const inHand = columns.flatMap(column => (column.current === null ? [] : [column.current]))
+    const nexts = columns.map(column => upcoming(column.next, inHand))
 
-    await learn($, repo, [...(currentNumber === null ? [] : [currentNumber]), ...nextNumbers], isFresh)
+    await learn($, repo, [...inHand, ...nexts.flat()], isFresh)
 
-    const next = nextNumbers.filter(number => known.get(number)?.isOpen === true).map(rowOf)
     const refreshedAt = await $.clock.now()
+    const fromPlan = usesPlan(held)
 
     await update($, dial, (): Dial => ({
-      past,
-      current: currentNumber === null ? null : rowOf(currentNumber),
-      next,
-      currentFrom: fromBranch !== null ? 'branch' : held.current !== null ? 'session' : null,
-      nextFrom: held.next.length > 0 ? 'session' : planned.length > 0 ? 'plan' : null,
+      columns: columns.map((column, index) => ({
+        current: column.current === null ? null : rowOf(column.current),
+        next: (nexts[index] ?? []).filter(number => known.get(number)?.isOpen === true).map(rowOf),
+      })),
+      currentFrom: held.length > 0 ? 'session' : fromBranch !== null ? 'branch' : null,
+      nextFrom: !fromPlan ? 'session' : planned.length > 0 ? 'plan' : null,
       error: null,
       refreshedAt,
     }))
@@ -164,18 +154,29 @@ export const register: Register = (on, options) => {
     setup = repo !== null && isAllowed(repo, repos) ? { repo, planFile, planHeading } : null
 
     if (setup !== null) {
-      await $.command.register({ name: 'issue-dial', description: 'Show the issue dial: recently closed, in hand, next up' })
+      await $.command.register({ name: 'issue-dial', description: 'Show the issue dial: each issue in hand and what could follow it' })
       await $.tool.register({
         name: TOOL,
         description:
-          `Updates the user's issue-dial pane with the GitHub issue now being worked on in this repo and the issues suggested next, as this conversation has settled them. Call it when the issue in hand changes or when a next issue is agreed. \`current\` null and \`next\` empty hands both back to the branch name and ${planFile}.`,
+          `Updates the user's issue-dial pane: one column per issue being worked on in this repo at the same time (up to ${MAX_COLUMNS}, e.g. one per parallel lane), each with the issue in hand and the issues suggested to follow it. Choose each column's \`next\` the way you would suggest parallel pairings: open issues that could follow that column's issue without colliding with what the other columns have in hand, most likely first. Call it when an issue in hand changes, a lane starts or ends, or what comes next is agreed. \`columns\` empty hands the dial back to the branch name and ${planFile}.`,
         inputSchema: {
           type: 'object',
           properties: {
-            current: { type: ['integer', 'null'], description: 'The issue number now being worked on, or null.' },
-            next: { type: 'array', items: { type: 'integer' }, maxItems: 5, description: 'Suggested next issue numbers, most likely first.' },
+            columns: {
+              type: 'array',
+              maxItems: MAX_COLUMNS,
+              description: 'One entry per issue in hand, in the order to show them left to right.',
+              items: {
+                type: 'object',
+                properties: {
+                  current: { type: ['integer', 'null'], description: 'The issue number this column has in hand, or null.' },
+                  next: { type: 'array', items: { type: 'integer' }, maxItems: 5, description: 'Issue numbers that could follow it, most likely first.' },
+                },
+                required: ['current', 'next'],
+              },
+            },
           },
-          required: ['current', 'next'],
+          required: ['columns'],
         },
       })
       void $.ui.open({ id: PANE, title: TITLE, rows: PANE_ROWS })
@@ -204,18 +205,28 @@ export const register: Register = (on, options) => {
   })
 
   on('tool.call', { tool: 'mcp__issue-dial__set_focus' }, async ($, e) => {
-    const input = e as unknown as { current?: unknown; next?: unknown }
-    const current = Number.isInteger(input.current) ? (input.current as number) : null
-    const next = Array.isArray(input.next) ? input.next.filter((n): n is number => Number.isInteger(n)).slice(0, 5) : []
+    const input = e as unknown as { columns?: unknown }
+    const columns = (Array.isArray(input.columns) ? input.columns : []).slice(0, MAX_COLUMNS).map((column: unknown): ColumnFocus => {
+      const { current, next } = (column ?? {}) as { current?: unknown; next?: unknown }
 
-    await update($, focus, () => ({ current, next }))
+      return {
+        current: Number.isInteger(current) ? (current as number) : null,
+        next: Array.isArray(next) ? next.filter((n): n is number => Number.isInteger(n)).slice(0, 5) : [],
+      }
+    })
+
+    await update($, focus, () => ({ columns }))
     await refresh($, false)
 
     const shown = await read($, dial)
     const named = (row: IssueRow | null) => (row === null ? 'none' : `Issue #${row.number}`)
 
+    const said = (shown.columns.length > 0 ? shown.columns : [NO_COLUMN])
+      .map(column => `now ${named(column.current)} (from ${shown.currentFrom ?? 'nothing'}), next ${column.next.map(named).join(', ') || 'none'}`)
+      .join('; ')
+
     return {
-      result: `Issue dial: now ${named(shown.current)} (from ${shown.currentFrom ?? 'nothing'}), next ${shown.next.map(named).join(', ') || 'none'}.${shown.error ? ` Refresh failed: ${shown.error}` : ''}`,
+      result: `Issue dial: ${said}.${shown.error ? ` Refresh failed: ${shown.error}` : ''}`,
     }
   })
 
@@ -232,7 +243,7 @@ export const register: Register = (on, options) => {
         {
           id: 'issue-dial:focus',
           scope: 'session',
-          text: `The user keeps an issue-dial pane open for ${setup.repo.owner}/${setup.repo.name}. When the issue in hand changes, or you and the user settle what comes next, call mcp__issue-dial__${TOOL} so it stays true. The branch name already sets the current issue while on an issue branch.`,
+          text: `The user keeps an issue-dial pane open for ${setup.repo.owner}/${setup.repo.name}: up to ${MAX_COLUMNS} columns, one per issue in hand (one per parallel lane), each with the issues that could follow it. When an issue in hand changes, a lane starts or ends, or you and the user settle what comes next, call mcp__issue-dial__${TOOL} so it stays true, choosing each column's next issues the way you would suggest parallel pairings. With no columns set, the branch name sets the issue in hand.`,
         },
       ],
     }
@@ -241,45 +252,46 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Button, Text } = $.ui.resolve(e)
     const state = await read($, dial)
+    const shown = state.columns.length > 0 ? state.columns : [NO_COLUMN]
     const width = Math.max(10, e.props.bodyColumns)
-    const rule = '─'.repeat(width)
-    const label = (row: IssueRow) => `Issue #${row.number}  ${row.title}`
+    const columnWidth = Math.max(4, Math.floor((width - COLUMN_GAP * (shown.length - 1)) / shown.length))
+    const rule = '─'.repeat(columnWidth)
+    const label = (row: IssueRow) => (shown.length === 1 ? `Issue #${row.number}  ${row.title}` : `#${row.number} ${row.title}`)
 
-    const wheel = buildWheel(state.past, state.current, state.next).map(slot => {
-      const fade = fadeOf(slot.distance)
-
-      if (fade === 'center') {
-        return (
-          <Box key="now" flexDirection="column">
-            <Text dimColor>{rule}</Text>
-            <Text bold color={slot.row === null ? undefined : OPEN_GREEN} wrap="truncate-end">
-              {slot.row === null ? 'Nothing in hand' : label(slot.row)}
+    const columns = shown.map((column, index) => (
+      <Box key={`column-${index}`} flexDirection="column" width={columnWidth}>
+        {buildWheel(column.current, column.next).map(slot =>
+          fadeOf(slot.distance) === 'center' ? (
+            <Box key="now" flexDirection="column">
+              <Text dimColor>{rule}</Text>
+              <Text bold color={slot.row === null ? undefined : OPEN_GREEN} wrap="truncate-end">
+                {slot.row === null ? 'Nothing in hand' : label(slot.row)}
+              </Text>
+              <Text dimColor>{rule}</Text>
+            </Box>
+          ) : (
+            <Text key={`next-${slot.distance}`} color={fadedColor(OPEN_GREEN, slot.distance)} wrap="truncate-end">
+              {drumIndent(slot.distance)}
+              {slot.row === null ? '' : label(slot.row)}
             </Text>
-            <Text dimColor>{rule}</Text>
-          </Box>
-        )
-      }
-
-      return (
-        <Text
-          key={`${slot.kind}-${slot.distance}`}
-          color={fadedColor(slot.kind === 'past' ? CLOSED_PURPLE : OPEN_GREEN, slot.distance)}
-          wrap="truncate-end"
-        >
-          {drumIndent(slot.distance)}
-          {slot.row === null ? '' : label(slot.row)}
-        </Text>
-      )
-    })
+          ),
+        )}
+        {column.next.length === 0 && state.refreshedAt !== null && (
+          <Text dimColor wrap="truncate-end">
+            Nothing queued next.
+          </Text>
+        )}
+      </Box>
+    ))
 
     const sources = `now: ${state.currentFrom ?? 'none'} · next: ${state.nextFrom === 'plan' ? planFile : (state.nextFrom ?? 'none')}`
 
     return (
       <Box flexDirection="column">
         {state.refreshedAt === null && state.error === null && <Text dimColor>Reading the issues…</Text>}
-        {state.past.length === 0 && state.refreshedAt !== null && <Text dimColor>No closed issues found.</Text>}
-        {wheel}
-        {state.next.length === 0 && state.refreshedAt !== null && <Text dimColor>Nothing queued next.</Text>}
+        <Box flexDirection="row" columnGap={COLUMN_GAP}>
+          {columns}
+        </Box>
         <Box>
           <Text dimColor wrap="truncate-end">
             {sources}{' '}
